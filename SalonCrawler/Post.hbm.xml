@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hibernate-mapping assembly="SalonCrawler" namespace="SalonCrawler" xmlns="urn:nhibernate-mapping-2.2">
+  <class name="Post" table="POST" lazy="true" >
+    <id name="Id" column="ID">
+      <generator class="identity" />
+    </id>
+    
+    <property name="Title" not-null="true" />
+    <property name="Date" not-null="true"/>
+    <property name="ViewCount" />
+    <property name="CommentCount" />
+    <property name="PostContent" />
+    <property name="FacebookLikes" />
+    <property name="TwitterLikes" />
+    <property name="GoogleLikes" />
+    <property name="WykopLikes" />
+    <property name="Tags" />
+    <property name="LastUpdatedOn" />
+
+    <many-to-one name="User">
+      <column name="UserID" sql-type="int" not-null="false" />
+    </many-to-one>
+    <many-to-one name="Category">
+      <column name="CategoryID" sql-type="int" not-null="false" />
+    </many-to-one>
+   
+    <bag name="Comments">
+      <key column="PostID" />
+      <one-to-many class="Comment" />
+    </bag>
+    <bag name="Reposts">
+      <key column="PostID" />
+      <one-to-many class="Repost" />
+    </bag>
+  </class>
+</hibernate-mapping>

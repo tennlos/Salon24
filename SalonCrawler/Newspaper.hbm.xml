@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hibernate-mapping assembly="SalonCrawler" namespace="SalonCrawler" xmlns="urn:nhibernate-mapping-2.2">
+  <class name="Newspaper" table="NEWSPAPER" lazy="true" >
+    <id name="Id" column="ID">
+      <generator class="identity" />
+    </id>
+    <many-to-one name="User">
+      <column name="ModeratorID" not-null="true" />
+    </many-to-one>
+    <property name="Name" not-null="true" />
+    <property name="Description"/>
+    <property name="ExtendedDescription"/>
+    <bag name="Reposts">
+      <key column="PaperID" />
+      <one-to-many class="Repost" />
+    </bag>
+  </class>
+</hibernate-mapping>

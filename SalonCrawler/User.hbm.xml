@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hibernate-mapping assembly="SalonCrawler" namespace="SalonCrawler" xmlns="urn:nhibernate-mapping-2.2">
+  <class name="User" table="`USER`">
+    <id name="Id" column="ID">
+      <generator class="identity" />
+    </id>
+    <property name="Nick" not-null="true" />
+    <property name="AboutMe" />
+    <property name="Description" />
+    <property name="Address" />
+    <property name="PostCount" />
+    <property name="CommentCount" />
+    <property name="ViewCount" />
+    <property name="LastUpdatedOn" />
+    
+    
+    <!--
+    <property name="Description">
+      <column name="Description" sql-type="nvarchar" not-null="false" />
+    </property>
+    <property name="Address">
+      <column name="Address" sql-type="nvarchar" not-null="false" />
+    </property>
+    <property name="Postcount">
+      <column name="PostCount" sql-type="int" not-null="false" />
+    </property>
+    <property name="Commentcount">
+      <column name="CommentCount" sql-type="int" not-null="false" />
+    </property>
+    <property name="Viewcount">
+      <column name="ViewCount" sql-type="int" not-null="false" />
+    </property>
+    <property name="Lastupdatedon">
+      <column name="LastUpdatedOn" sql-type="datetime" not-null="false" />
+    </property>-->
+    <!--
+    <bag name="Comment">
+      <key column="UserID" />
+      <one-to-many class="Comment" />
+    </bag> -->
+    <bag name="Newspapers">
+      <key column="ModeratorID" />
+      <one-to-many class="Newspaper" />
+    </bag>
+    <bag name="Posts">
+      <key column="UserID" />
+      <one-to-many class="Post" />
+    </bag> 
+  </class>
+</hibernate-mapping>

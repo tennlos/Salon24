@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hibernate-mapping assembly="SalonCrawler" namespace="SalonCrawler" xmlns="urn:nhibernate-mapping-2.2">
+  <class name="Repost" table="REPOST" lazy="true" >
+    <id name="Id" column="ID">
+      <generator class="identity" />
+    </id>
+    <many-to-one name="Post">
+      <column name="PostID" not-null="true" />
+    </many-to-one>
+    <many-to-one name="Newspaper">
+      <column name="PaperID" not-null="true" />
+    </many-to-one>
+  </class>
+</hibernate-mapping>
