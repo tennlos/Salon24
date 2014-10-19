@@ -38,7 +38,7 @@
       <key column="UserID" />
       <one-to-many class="Comment" />
     </bag> -->
-    <bag name="Newspapers">
+    <bag name="Newspapers" inverse="true">
       <key column="ModeratorID" />
       <one-to-many class="Newspaper" />
     </bag>

@@ -10,9 +10,9 @@
     <property name="Name" not-null="true" />
     <property name="Description"/>
     <property name="ExtendedDescription"/>
-    <bag name="Reposts">
+    <bag name="Posts" table="Repost" lazy="false">
       <key column="PaperID" />
-      <one-to-many class="Repost" />
+      <many-to-many class="Post" column="PostID" />
     </bag>
   </class>
 </hibernate-mapping>

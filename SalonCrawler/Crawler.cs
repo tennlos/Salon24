@@ -227,11 +227,59 @@ namespace SalonCrawler
                 newPost.LastUpdatedOn = DateTime.Now;
 
                 newPost.Comments = GetComments(doc, newPost);
+                newPost.Newspapers = GetNewspapers(doc, newPost);
+
             }
             catch (Exception e)
             {
                 Logger.Log(e);
             }
+        }
+
+        private IList<Newspaper> GetNewspapers(HtmlDocument doc, Post newPost)
+        {
+            List<Newspaper> newspapers = new List<Newspaper>();
+            var node = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-newspapers");
+            if (node == null)
+                return newspapers;
+            foreach (var _node in node.Descendants("a"))
+            {
+                if (_node.Attributes["href"] == null)
+                    continue;
+
+                var address = _node.Attributes["href"].Value;
+                if (!address.StartsWith("http://lubczasopismo")) // the same link again
+                    continue;
+
+                var request = WebRequest.Create(address);
+                var newspaperContent = GetHtmlDocument(request);
+
+                var newsNode = CrawlerHelper.GetNodeByPartialClass(newspaperContent.DocumentNode, "author-about-body");
+                var aNode = newsNode.Descendants("a").First();
+                Newspaper newspaper = new Newspaper();
+                var _user = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", aNode.InnerText)).List<User>().FirstOrDefault();
+                if (_user != null)
+                {
+                    newspaper.User = _user;
+                }
+                else
+                {
+                    User user = new User();
+                    user.Nick = aNode.InnerText;
+                    user.Address = aNode.Attributes["href"].Value;
+                    GetUserInfo(user, true);
+                    newspaper.User = user;
+                }
+                    
+                newspaper.Posts = new List<Post>();
+                var nameNode = CrawlerHelper.GetNodeByID(newspaperContent.DocumentNode, "newspaper-header");
+                var aaNode = nameNode.Descendants("a").First();
+                newspaper.Name = aaNode.InnerText;
+                newspaper.Description = CrawlerHelper.GetStringValueById(newspaperContent.DocumentNode, "newspaper-slogan");
+                newspapers.Add(newspaper);
+
+            }
+            return newspapers;
         }
 
         private string GetTags(HtmlNode tagsNode)

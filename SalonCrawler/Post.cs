@@ -22,6 +22,6 @@ namespace SalonCrawler {
         public virtual string Tags { get; set; }
         public virtual DateTime? LastUpdatedOn { get; set; }
         public virtual IList<Comment> Comments { get; set; }
-        public virtual IList<Repost> Reposts { get; set; }
+        public virtual IList<Newspaper> Newspapers { get; set; }
     }
 }

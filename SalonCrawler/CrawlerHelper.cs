@@ -9,12 +9,20 @@ namespace SalonCrawler
         public static HtmlNode GetNodeByClass(HtmlNode node, string hclass, int index = 0)
         {
             var k = node.DescendantsAndSelf().Where(x => x.Attributes["class"] != null && x.Attributes["class"].Value == hclass);
+            if (k.Count() == 0)
+                return null;
             return k.ElementAt(index);
         }
 
         public static HtmlNode GetNodeByPartialClass(HtmlNode node, string hclass, int index = 0)
         {
             var k = node.DescendantsAndSelf().Where(x => x.Attributes["class"] != null && x.Attributes["class"].Value.Contains(hclass));
+            return k.ElementAt(index);
+        }
+
+        public static HtmlNode GetNodeByID(HtmlNode node, string hid, int index = 0)
+        {
+            var k = node.DescendantsAndSelf().Where(x => x.Attributes["id"] != null && x.Attributes["id"].Value == hid);
             return k.ElementAt(index);
         }
 

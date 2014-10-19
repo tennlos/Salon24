@@ -28,9 +28,9 @@
       <key column="PostID" />
       <one-to-many class="Comment" />
     </bag>
-    <bag name="Reposts">
+    <bag name="Newspapers" table="Repost" lazy="false" cascade="all">
       <key column="PostID" />
-      <one-to-many class="Repost" />
+      <many-to-many class="Newspaper" column="PaperID" />
     </bag>
   </class>
 </hibernate-mapping>
