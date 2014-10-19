@@ -6,7 +6,9 @@ using System.Collections.Generic;
 namespace SalonCrawler {
     
     public partial class User {
-        public User() { }
+        public User() {
+            this.Newspapers = new List<Newspaper>();
+        }
         public virtual int Id { get; set; }
         public virtual string Nick { get; set; }
         public virtual string AboutMe { get; set; }
