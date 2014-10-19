@@ -10,8 +10,8 @@
     <many-to-one name="Post">
       <column name="PostID" not-null="true" />
     </many-to-one>
-    <property name="Title"/>
-    <property name="CommentContent"/>
+    <property name="Title" type="string" length="1000000"/>
+    <property name="CommentContent" type="string" length="1000000"/>
     <property name="CreationDate" not-null="true"/>
   </class>
 </hibernate-mapping>

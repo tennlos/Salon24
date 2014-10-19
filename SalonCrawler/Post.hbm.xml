@@ -9,7 +9,7 @@
     <property name="Date" not-null="true"/>
     <property name="ViewCount" />
     <property name="CommentCount" />
-    <property name="PostContent" />
+    <property name="PostContent" type="string" length="1000000" />
     <property name="FacebookLikes" />
     <property name="TwitterLikes" />
     <property name="GoogleLikes" />
