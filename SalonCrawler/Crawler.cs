@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using HtmlAgilityPack;
 using System.IO;
 using System.Net;
@@ -19,7 +17,8 @@ namespace SalonCrawler
         private readonly int _postsPerUser;
         private readonly ISession _session;
 
-        private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>(); 
+        private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>();
+        private readonly Dictionary<string, Newspaper> _currentNewspapers = new Dictionary<string, Newspaper>();
 
         public Crawler(ISession session, int postsPerUser)
         {
@@ -124,6 +123,7 @@ namespace SalonCrawler
                     Logger.Log("Nick: " + user.Nick);
                     GetUserInfo(user, false);
                     _session.Save(user);
+                    _session.Flush();
                     break; // TODO temporary to stop crawling after 1 user
                 }
             }
@@ -175,6 +175,7 @@ namespace SalonCrawler
         {
             Logger.Log("Getting posts for the user.");
 
+            _currentNewspapers.Clear();
             var postList = new List<Post>();
             var posts = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-list");
             var counter = 1;
@@ -238,48 +239,85 @@ namespace SalonCrawler
 
         private IList<Newspaper> GetNewspapers(HtmlDocument doc, Post newPost)
         {
-            List<Newspaper> newspapers = new List<Newspaper>();
-            var node = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-newspapers");
-            if (node == null)
+            var newspapers = new List<Newspaper>();
+            var newspapersNode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-newspapers");
+            if (newspapersNode == null)
                 return newspapers;
-            foreach (var _node in node.Descendants("a"))
-            {
-                if (_node.Attributes["href"] == null)
-                    continue;
 
-                var address = _node.Attributes["href"].Value;
+            Logger.Log("Getting newspapers for the post.");
+
+            foreach (var node in newspapersNode.Descendants("a"))
+            {
+                if (node.Attributes["href"] == null)
+                    continue;
+                var address = node.Attributes["href"].Value;
                 if (!address.StartsWith("http://lubczasopismo")) // the same link again
                     continue;
-
                 var request = WebRequest.Create(address);
                 var newspaperContent = GetHtmlDocument(request);
-
-                var newsNode = CrawlerHelper.GetNodeByPartialClass(newspaperContent.DocumentNode, "author-about-body");
-                var aNode = newsNode.Descendants("a").First();
-                Newspaper newspaper = new Newspaper();
-                var _user = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", aNode.InnerText)).List<User>().FirstOrDefault();
-                if (_user != null)
+                var newspaper = new Newspaper();
+                var nameNode = CrawlerHelper.GetNodeByID(newspaperContent.DocumentNode, "newspaper-header");
+                var name = nameNode.Descendants("a").First().InnerText;
+                var newspaperForName = _session.CreateCriteria<Newspaper>()
+                    .Add(Restrictions.Eq("Name", name)).List<Newspaper>().FirstOrDefault();
+                if (newspaperForName == null)
                 {
-                    newspaper.User = _user;
+                    if (_currentNewspapers.ContainsKey(name))
+                    {
+                        var existing = _currentNewspapers[name];
+                        existing.Posts.Add(newPost);
+                        newspapers.Add(existing);
+                    }
+                    else
+                    {
+                        newspaper.Name = name;
+                        GetNewspaperInfo(newspaper, newspaperContent.DocumentNode, newPost);
+                        _currentNewspapers[name] = newspaper;
+                        newspapers.Add(newspaper);
+                    }
                 }
                 else
                 {
-                    User user = new User();
-                    user.Nick = aNode.InnerText;
-                    user.Address = aNode.Attributes["href"].Value;
-                    GetUserInfo(user, true);
-                    newspaper.User = user;
+                    newspaperForName.Posts.Add(newPost);
+                    newspapers.Add(newspaper);
+                    _session.Update(newspaperForName);
                 }
-                    
-                newspaper.Posts = new List<Post>();
-                var nameNode = CrawlerHelper.GetNodeByID(newspaperContent.DocumentNode, "newspaper-header");
-                var aaNode = nameNode.Descendants("a").First();
-                newspaper.Name = aaNode.InnerText;
-                newspaper.Description = CrawlerHelper.GetStringValueById(newspaperContent.DocumentNode, "newspaper-slogan");
-                newspapers.Add(newspaper);
-
+                
             }
             return newspapers;
+        }
+
+        private void GetNewspaperInfo(Newspaper newNewspaper, HtmlNode newspaperNode, Post newPost)
+        {
+            newNewspaper.Description = CrawlerHelper.GetStringValueById(newspaperNode, "newspaper-slogan");
+            var newsNode = CrawlerHelper.GetNodeByPartialClass(newspaperNode, "author-about-body");
+            var userNode = newsNode.Descendants("a").First();
+            var nick = userNode.InnerText;
+            var address = userNode.Attributes["href"].Value;
+            var commentCount = Convert.ToInt32(
+                CrawlerHelper.GetStringValueByClass(newsNode, "with-icon author-comments"));
+            newNewspaper.User = GetUserForNewspaper(nick, address, commentCount);
+            newNewspaper.Posts = new List<Post> { newPost };
+        }
+
+        private User GetUserForNewspaper(string nick, string address, int commentCount)
+        {
+            var user = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", nick)).List<User>().FirstOrDefault();
+            if (user != null)
+            {
+                return user;
+            }
+            Logger.Log("Creating user for the newspaper");
+            Logger.Log("Nick: " + nick);
+            user = new User
+            {
+                Nick = nick,
+                Address = address,
+                CommentCount = commentCount
+            };
+            GetUserInfo(user, true);
+            _session.Save(user);
+            return _session.Get<User>(user.Id);
         }
 
         private string GetTags(HtmlNode tagsNode)
@@ -367,7 +405,7 @@ namespace SalonCrawler
             }
             Logger.Log("Creating user for the comment");
             Logger.Log("Nick: " + nick);
-            user = new User()
+            user = new User
             {
                 Nick = nick,
                 Address = address,

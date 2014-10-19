@@ -10,7 +10,7 @@
     <property name="Name" not-null="true" />
     <property name="Description"/>
     <property name="ExtendedDescription"/>
-    <bag name="Posts" table="Repost" lazy="false">
+    <bag name="Posts" table="Repost" lazy="false" inverse="true">
       <key column="PaperID" />
       <many-to-many class="Post" column="PostID" />
     </bag>
