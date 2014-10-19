@@ -24,7 +24,7 @@
       <column name="CategoryID" sql-type="int" not-null="false" />
     </many-to-one>
    
-    <bag name="Comments">
+    <bag name="Comments" cascade="all">
       <key column="PostID" />
       <one-to-many class="Comment" />
     </bag>

@@ -42,8 +42,8 @@
       <key column="ModeratorID" />
       <one-to-many class="Newspaper" />
     </bag>
-    <bag name="Posts">
-      <key column="UserID" />
+    <bag name="Posts" cascade="all">
+      <key column="UserID" not-null="false" />
       <one-to-many class="Post" />
     </bag> 
   </class>

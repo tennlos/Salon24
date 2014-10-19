@@ -5,33 +5,32 @@ using System.Text;
 using System.Threading.Tasks;
 using NHibernate;
 using NHibernate.Cfg;
-using System.Reflection;
 
 namespace SalonCrawler
 {
     public sealed class NHibernateHelper
     {
-        private static ISessionFactory SessionFactory;
+        private static ISessionFactory _sessionFactory;
 
         private static void OpenSession()
         {
-            Configuration configuration = new Configuration();
+            var configuration = new Configuration();
             configuration.Configure();
-            SessionFactory = configuration.BuildSessionFactory();
+            _sessionFactory = configuration.BuildSessionFactory();
         }
 
         public static ISession GetCurrentSession()
         {
-            if (SessionFactory == null)
-                NHibernateHelper.OpenSession();
+            if (_sessionFactory == null)
+                OpenSession();
 
-            return SessionFactory.OpenSession();
+            return _sessionFactory.OpenSession();
         }
 
         public static void CloseSessionFactory()
         {
-            if (SessionFactory != null)
-                SessionFactory.Close();
+            if (_sessionFactory != null)
+                _sessionFactory.Close();
         }
     }
 }

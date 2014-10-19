@@ -1,26 +1,17 @@
-﻿using NHibernate;
-using NHibernate.Cfg;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿using System;
 
 namespace SalonCrawler
 {
     public class Program
     {
-        
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
-            ISession session = NHibernateHelper.GetCurrentSession();
-            Crawler crawler = new Crawler();
+            var session = NHibernateHelper.GetCurrentSession();
+            var crawler = new Crawler(session, 10);
             crawler.Crawl();
-        }
-
-        
+            session.Close();
+            Logger.Log("Crawling finished.");
+            Console.Read();
+        }   
     }
 }
