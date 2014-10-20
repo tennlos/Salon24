@@ -124,7 +124,6 @@ namespace SalonCrawler
                     GetUserInfo(user, false);
                     _session.Save(user);
                     _session.Flush();
-                    break; // TODO temporary to stop crawling after 1 user
                 }
             }
             catch (Exception e)
