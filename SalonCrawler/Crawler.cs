@@ -14,17 +14,19 @@ namespace SalonCrawler
     {
         private const string HomePage = "http://www.salon24.pl/";
         private const string UserPage = "http://www.salon24.pl/catalog/1,1,CountComments,2";
+
         private readonly int _postsPerUser;
         private readonly ISession _session;
-        private static int MaxPages = 10;
+        private readonly int _maxPages;
 
         private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>();
         private readonly Dictionary<string, Newspaper> _currentNewspapers = new Dictionary<string, Newspaper>();
 
-        public Crawler(ISession session, int postsPerUser)
+        public Crawler(ISession session, int postsPerUser, int maxPages)
         {
             _session = session;
             _postsPerUser = postsPerUser;
+            _maxPages = maxPages;
         }
 
         public void Crawl()
@@ -129,8 +131,11 @@ namespace SalonCrawler
                     };
                     Logger.Log("Nick: " + user.Nick);
                     GetUserInfo(user, false);
+                    Logger.Log("Saving user...");
                     _session.Save(user);
                     _session.Flush();
+                    Logger.Log("User saved!");
+                    break; // TODO
                 }
             }
             catch (Exception e)
@@ -171,7 +176,12 @@ namespace SalonCrawler
                 }
                 user.LastUpdatedOn = DateTime.Now;
 
-                user.Posts = basic ? new List<Post>() : GetPostsForPage(doc, user,1);
+                if (!basic)
+                {
+                    _currentNewspapers.Clear();
+                }
+
+                user.Posts = basic ? new List<Post>() : GetPostsForPage(doc, user, 1);
             }
             catch (Exception e)
             {
@@ -179,14 +189,14 @@ namespace SalonCrawler
             }
         }
 
-        private IList<Post> GetPostsForPage(HtmlDocument doc, User user,int page)
+        private IList<Post> GetPostsForPage(HtmlDocument doc, User user, int page)
         {
-            Logger.Log("Getting posts for the user. Page = "+page.ToString());
+            Logger.Log("Getting posts for the user. Page = " + page);
 
             if (page > 1)
             {
                 var pagenode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "pages");
-                if (pagenode != null && page < Crawler.MaxPages)
+                if (pagenode != null && page < _maxPages)
                 {
                     var nextpage = CrawlerHelper.GetNodeByClass(pagenode, "pages_right");
                     doc = GetHtmlDocument(WebRequest.Create(user.Address + nextpage.Attributes["href"].Value));
@@ -197,7 +207,6 @@ namespace SalonCrawler
                     return new List<Post>();
             }       
 
-            _currentNewspapers.Clear();
             var postList = new List<Post>();
             var posts = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-list");
             var counter = 1;
@@ -283,7 +292,7 @@ namespace SalonCrawler
                     continue;
                 var request = WebRequest.Create(address);
                 var newspaperContent = GetHtmlDocument(request);
-                if (doc == null)
+                if (newspaperContent == null)
                     continue;
                 var newspaper = new Newspaper();
                 var nameNode = CrawlerHelper.GetNodeByID(newspaperContent.DocumentNode, "newspaper-header");
