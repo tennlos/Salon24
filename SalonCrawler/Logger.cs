@@ -19,7 +19,7 @@ namespace SalonCrawler
             Console.WriteLine(e.Message);
             Console.WriteLine("### --------- ###");
 
-            using (var logStream = new StreamWriter(Filename))
+            using (var logStream = File.AppendText(Filename))
             {
                 logStream.WriteLine(DateTime.Now);
                 logStream.WriteLine(e.GetType().FullName);

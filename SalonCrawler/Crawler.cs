@@ -15,17 +15,17 @@ namespace SalonCrawler
         private const string HomePage = "http://www.salon24.pl/";
         private const string UserPage = "http://www.salon24.pl/catalog/1,1,CountComments,2";
 
-        private readonly int _postsPerUser;
         private readonly ISession _session;
+        private readonly int _maxUsers;
         private readonly int _maxPages;
 
         private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>();
         private readonly Dictionary<string, Newspaper> _currentNewspapers = new Dictionary<string, Newspaper>();
 
-        public Crawler(ISession session, int postsPerUser, int maxPages)
+        public Crawler(ISession session, int maxUsers, int maxPages)
         {
             _session = session;
-            _postsPerUser = postsPerUser;
+            _maxUsers = maxUsers;
             _maxPages = maxPages;
         }
 
@@ -120,6 +120,7 @@ namespace SalonCrawler
                     from input in doc.DocumentNode.Descendants("ul")
                     where input.Attributes["class"] != null && input.Attributes["class"].Value == "author-list-2cols-left"
                     select input;
+                var userCounter = 0;
                 var content = from input in tcontent.First().Descendants("a") select input;
                 foreach (var node in content)
                 {
@@ -135,7 +136,9 @@ namespace SalonCrawler
                     _session.Save(user);
                     _session.Flush();
                     Logger.Log("User saved!");
-                    break; // TODO
+                    ++userCounter;
+                    if (userCounter == _maxUsers)
+                        break;
                 }
             }
             catch (Exception e)
@@ -169,10 +172,10 @@ namespace SalonCrawler
                 }
                 else
                 {
-                    user.AboutMe = CrawlerHelper.GetStringValueByClass(content, "author-about-desc");
+                    user.AboutMe = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueByClass(content, "author-about-desc"));
                     user.PostCount = Convert.ToInt32(CrawlerHelper.GetStringValueByClass(content, "with-icon author-posts"));
                     user.CommentCount = Convert.ToInt32(CrawlerHelper.GetStringValueByClass(content, "with-icon author-comments"));
-                    user.Description = CrawlerHelper.GetStringValueById(doc.DocumentNode, "blog-header-title");
+                    user.Description = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueById(doc.DocumentNode, "blog-header-title"));
                 }
                 user.LastUpdatedOn = DateTime.Now;
 
@@ -196,9 +199,11 @@ namespace SalonCrawler
             if (page > 1)
             {
                 var pagenode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "pages");
-                if (pagenode != null && page < _maxPages)
+                if (pagenode != null && page <= _maxPages)
                 {
                     var nextpage = CrawlerHelper.GetNodeByClass(pagenode, "pages_right");
+                    if (nextpage == null)
+                        return new List<Post>();
                     doc = GetHtmlDocument(WebRequest.Create(user.Address + nextpage.Attributes["href"].Value));
                     if (doc == null)
                         return new List<Post>();
@@ -209,7 +214,6 @@ namespace SalonCrawler
 
             var postList = new List<Post>();
             var posts = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-list");
-            var counter = 1;
             foreach (var post in posts.Descendants("h2"))
             {
                 var content = from input in post.Descendants("a") select input;
@@ -225,12 +229,7 @@ namespace SalonCrawler
                     var newPost = new Post { User = user, Address = address };
                     GetPostInfo(newPost, address, user.Address);
                     postList.Add(newPost);
-                    ++counter;
-                    if (counter > _postsPerUser)
-                        break;
                 }
-                if (counter > _postsPerUser)
-                    break;
             }
             var addlist = GetPostsForPage(doc, user, ++page);
             if (addlist.Count > 0)
@@ -250,7 +249,7 @@ namespace SalonCrawler
             try
             {
                 var sitePostId = address.Split('/')[3].Split(',')[0];
-                newPost.Title = CrawlerHelper.GetStringValueByClass(doc.DocumentNode, "cqi_s_no cqi_t_post cqi_oid_" + sitePostId);
+                newPost.Title = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueByClass(doc.DocumentNode, "cqi_s_no cqi_t_post cqi_oid_" + sitePostId));
                 var dateString = CrawlerHelper.GetStringValueByClass(doc.DocumentNode, "created");
                 newPost.Date = Utils.ParseDate(dateString);
                 var postNode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post");
@@ -259,12 +258,12 @@ namespace SalonCrawler
                 newPost.Category = _session.Get<Category>(_categoryDict[categoryCode]);
                 newPost.CommentCount = Convert.ToInt32(
                     CrawlerHelper.GetStringValueByTagAndClass(postNode, "span", "sep", 1).Split(' ')[0]);
-                newPost.PostContent = GetContent(postNode, userAddress);
+                newPost.PostContent = WebUtility.HtmlDecode(GetContent(postNode, userAddress));
                 newPost.Tags = GetTags(CrawlerHelper.GetNodeByClass(postNode, "post-tags"));
                 newPost.LastUpdatedOn = DateTime.Now;
 
                 newPost.Comments = new List<Comment>();
-                //newPost.Comments = GetComments(doc, newPost);
+                newPost.Comments = GetComments(doc, newPost);
                 newPost.Newspapers = GetNewspapers(doc, newPost);
 
             }
@@ -296,7 +295,7 @@ namespace SalonCrawler
                     continue;
                 var newspaper = new Newspaper();
                 var nameNode = CrawlerHelper.GetNodeByID(newspaperContent.DocumentNode, "newspaper-header");
-                var name = nameNode.Descendants("a").First().InnerText;
+                var name = WebUtility.HtmlDecode(nameNode.Descendants("a").First().InnerText);
                 var newspaperForName = _session.CreateCriteria<Newspaper>()
                     .Add(Restrictions.Eq("Name", name)).List<Newspaper>().FirstOrDefault();
                 if (newspaperForName == null)
@@ -328,7 +327,7 @@ namespace SalonCrawler
 
         private void GetNewspaperInfo(Newspaper newNewspaper, HtmlNode newspaperNode, Post newPost)
         {
-            newNewspaper.Description = CrawlerHelper.GetStringValueById(newspaperNode, "newspaper-slogan");
+            newNewspaper.Description = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueById(newspaperNode, "newspaper-slogan"));
             var newsNode = CrawlerHelper.GetNodeByPartialClass(newspaperNode, "author-about-body");
             var userNode = newsNode.Descendants("a").First();
             var nick = userNode.InnerText;
@@ -426,8 +425,8 @@ namespace SalonCrawler
 
         private void GetCommentInfo(Comment newComment, HtmlNode commentNode)
         {
-            newComment.Title = CrawlerHelper.GetStringValueByTag(commentNode, "h3");
-            newComment.CommentContent = CrawlerHelper.GetStringValueByClass(commentNode, "comment-body");
+            newComment.Title = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueByTag(commentNode, "h3"));
+            newComment.CommentContent = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueByClass(commentNode, "comment-body"));
             var dateString = CrawlerHelper.GetStringValueByClass(commentNode, "sep");
             newComment.CreationDate = Utils.ParseDate(dateString);
             var userNick = CrawlerHelper.GetStringValueByPartialClass(commentNode, "author-nick");
