@@ -130,10 +130,13 @@ namespace SalonCrawler
                         Nick = node.InnerText,
                         Address = node.Attributes["href"].Value
                     };
+                    var existing = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", user.Nick)).List<User>().FirstOrDefault();
+                    if (existing != null)
+                        user = existing;
                     Logger.Log("Nick: " + user.Nick);
                     GetUserInfo(user, false);
                     Logger.Log("Saving user...");
-                    _session.Save(user);
+                    _session.SaveOrUpdate(user);
                     _session.Flush();
                     Logger.Log("User saved!");
                     ++userCounter;
