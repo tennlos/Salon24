@@ -222,7 +222,7 @@ namespace SalonCrawler
                     Logger.Log("Processing post started.");
                     Logger.Log("Address: " + address);
                     lastNode = address;
-                    var newPost = new Post { User = user };
+                    var newPost = new Post { User = user, Address = address };
                     GetPostInfo(newPost, address, user.Address);
                     postList.Add(newPost);
                     ++counter;

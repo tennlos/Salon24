@@ -10,7 +10,6 @@
     <property name="Address" />
     <property name="PostCount" />
     <property name="CommentCount" />
-    <property name="ViewCount" />
     <property name="LastUpdatedOn" />
     
     
