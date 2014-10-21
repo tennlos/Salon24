@@ -16,6 +16,7 @@ namespace SalonCrawler
         private const string UserPage = "http://www.salon24.pl/catalog/1,1,CountComments,2";
         private readonly int _postsPerUser;
         private readonly ISession _session;
+        private static int MaxPages = 10;
 
         private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>();
         private readonly Dictionary<string, Newspaper> _currentNewspapers = new Dictionary<string, Newspaper>();
@@ -40,6 +41,8 @@ namespace SalonCrawler
 
             var request = WebRequest.Create(HomePage);
             var doc = GetHtmlDocument(request);
+            if (doc == null)
+                return;
 
             try
             {
@@ -86,6 +89,8 @@ namespace SalonCrawler
 
             var request = WebRequest.Create(address);
             var doc = GetHtmlDocument(request);
+            if (doc == null)
+                return;
 
             try
             {
@@ -104,6 +109,8 @@ namespace SalonCrawler
 
             var request = WebRequest.Create(UserPage);
             var doc = GetHtmlDocument(request);
+            if (doc == null)
+                return;
 
             try
             {
@@ -138,6 +145,8 @@ namespace SalonCrawler
 
             var request = WebRequest.Create(user.Address);
             var doc = GetHtmlDocument(request);
+            if (doc == null)
+                return;
 
             try
             {
@@ -162,7 +171,7 @@ namespace SalonCrawler
                 }
                 user.LastUpdatedOn = DateTime.Now;
 
-                user.Posts = basic ? new List<Post>() : GetPosts(doc, user);
+                user.Posts = basic ? new List<Post>() : GetPostsForPage(doc, user,1);
             }
             catch (Exception e)
             {
@@ -170,15 +179,29 @@ namespace SalonCrawler
             }
         }
 
-        private IList<Post> GetPosts(HtmlDocument doc, User user)
+        private IList<Post> GetPostsForPage(HtmlDocument doc, User user,int page)
         {
-            Logger.Log("Getting posts for the user.");
+            Logger.Log("Getting posts for the user. Page = "+page.ToString());
+
+            if (page > 1)
+            {
+                var pagenode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "pages");
+                if (pagenode != null && page < Crawler.MaxPages)
+                {
+                    var nextpage = CrawlerHelper.GetNodeByClass(pagenode, "pages_right");
+                    doc = GetHtmlDocument(WebRequest.Create(user.Address + nextpage.Attributes["href"].Value));
+                    if (doc == null)
+                        return new List<Post>();
+                }
+                else
+                    return new List<Post>();
+            }       
 
             _currentNewspapers.Clear();
             var postList = new List<Post>();
             var posts = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-list");
             var counter = 1;
-            foreach (var post in posts.DescendantsAndSelf())
+            foreach (var post in posts.DescendantsAndSelf("h2"))
             {
                 var content = from input in post.Descendants("a") select input;
                 string lastNode = null;
@@ -191,7 +214,7 @@ namespace SalonCrawler
                     Logger.Log("Address: " + address);
                     lastNode = address;
                     var newPost = new Post { User = user };
-                    GetPostInfo(newPost, address, user.AboutMe);
+                    GetPostInfo(newPost, address, user.Address);
                     postList.Add(newPost);
                     ++counter;
                     if (counter > _postsPerUser)
@@ -200,6 +223,9 @@ namespace SalonCrawler
                 if (counter > _postsPerUser)
                     break;
             }
+            var addlist = GetPostsForPage(doc, user, ++page);
+            if (addlist.Count > 0)
+                postList.AddRange(addlist);
             return postList;
         }
 
@@ -209,6 +235,8 @@ namespace SalonCrawler
 
             var request = WebRequest.Create(address);
             var doc = GetHtmlDocument(request);
+            if (doc == null)
+                return;
 
             try
             {
@@ -226,7 +254,8 @@ namespace SalonCrawler
                 newPost.Tags = GetTags(CrawlerHelper.GetNodeByClass(postNode, "post-tags"));
                 newPost.LastUpdatedOn = DateTime.Now;
 
-                newPost.Comments = GetComments(doc, newPost);
+                newPost.Comments = new List<Comment>();
+                //newPost.Comments = GetComments(doc, newPost);
                 newPost.Newspapers = GetNewspapers(doc, newPost);
 
             }
@@ -254,6 +283,8 @@ namespace SalonCrawler
                     continue;
                 var request = WebRequest.Create(address);
                 var newspaperContent = GetHtmlDocument(request);
+                if (doc == null)
+                    continue;
                 var newspaper = new Newspaper();
                 var nameNode = CrawlerHelper.GetNodeByID(newspaperContent.DocumentNode, "newspaper-header");
                 var name = nameNode.Descendants("a").First().InnerText;
@@ -346,8 +377,10 @@ namespace SalonCrawler
             var pageLinkNodes = CrawlerHelper.GetAllNodesByTagAndClass(postNode, "a", "pages_pos");
             foreach (var pageLinkNode in pageLinkNodes)
             {
-                var request = WebRequest.Create(userAddress + pageLinkNode.Attributes["href"]);
+                var request = WebRequest.Create(userAddress + pageLinkNode.Attributes["href"].Value);
                 var doc = GetHtmlDocument(request);
+                if (doc == null)
+                    return contentBuilder.ToString();
                 var pagePostNode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post");
                 contentBuilder.Append(GetContentPart(pagePostNode));
             }
@@ -417,16 +450,27 @@ namespace SalonCrawler
 
         private HtmlDocument GetHtmlDocument(WebRequest request)
         {
-            var response = request.GetResponse();
-            var doc = new HtmlDocument();
-            var data = response.GetResponseStream();
-            string html;
-            using (var sr = new StreamReader(data))
+            try
             {
-                html = sr.ReadToEnd();
+                var response = request.GetResponse();
+                var data = response.GetResponseStream();
+                var doc = new HtmlDocument();
+
+                string html;
+                using (var sr = new StreamReader(data))
+                {
+                    html = sr.ReadToEnd();
+                }
+                doc.LoadHtml(html);
+                return doc;
+            
             }
-            doc.LoadHtml(html);
-            return doc;
+            catch (WebException ex) 
+            {
+                Logger.Log(ex);
+                return null;
+            }
+            
         }
     }
 }
