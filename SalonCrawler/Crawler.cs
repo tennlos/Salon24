@@ -201,7 +201,7 @@ namespace SalonCrawler
             var postList = new List<Post>();
             var posts = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-list");
             var counter = 1;
-            foreach (var post in posts.DescendantsAndSelf("h2"))
+            foreach (var post in posts.Descendants("h2"))
             {
                 var content = from input in post.Descendants("a") select input;
                 string lastNode = null;
