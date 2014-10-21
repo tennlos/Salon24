@@ -317,7 +317,7 @@ namespace SalonCrawler
                 else
                 {
                     newspaperForName.Posts.Add(newPost);
-                    newspapers.Add(newspaper);
+                    newspapers.Add(newspaperForName);
                     _session.Update(newspaperForName);
                 }
                 
