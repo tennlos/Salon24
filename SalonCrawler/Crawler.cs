@@ -13,7 +13,7 @@ namespace SalonCrawler
     public class Crawler
     {
         private const string HomePage = "http://www.salon24.pl/";
-        private const string UserPage = "http://www.salon24.pl/catalog/1,1,CountComments,2";
+        private const string UserPage = "http://www.salon24.pl/catalog/1,1,CountPosts,2";
 
         private readonly ISession _session;
         private readonly int _maxUsers;
