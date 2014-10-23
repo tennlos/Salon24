@@ -116,37 +116,48 @@ namespace SalonCrawler
 
             try
             {
-                var tcontent =
+                var leftside =
                     from input in doc.DocumentNode.Descendants("ul")
                     where input.Attributes["class"] != null && input.Attributes["class"].Value == "author-list-2cols-left"
                     select input;
-                var userCounter = 0;
-                var content = from input in tcontent.First().Descendants("a") select input;
-                foreach (var node in content)
-                {
-                    Logger.Log("Processing user started.");
-                    var user = new User
-                    {
-                        Nick = node.InnerText,
-                        Address = node.Attributes["href"].Value
-                    };
-                    var existing = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", user.Nick)).List<User>().FirstOrDefault();
-                    if (existing != null)
-                        user = existing;
-                    Logger.Log("Nick: " + user.Nick);
-                    GetUserInfo(user, false);
-                    Logger.Log("Saving user...");
-                    _session.SaveOrUpdate(user);
-                    _session.Flush();
-                    Logger.Log("User saved!");
-                    ++userCounter;
-                    if (userCounter == _maxUsers)
-                        break;
-                }
+                ProcessUser(leftside);
+                var rightside =
+                    from input in doc.DocumentNode.Descendants("ul")
+                    where input.Attributes["class"] != null && input.Attributes["class"].Value == "author-list-2cols-right"
+                    select input;
+                ProcessUser(rightside);
+                
             }
             catch (Exception e)
             {
                 Logger.Log(e);
+            }
+        }
+
+        private void ProcessUser(IEnumerable<HtmlNode> tcontent)
+        {
+            var userCounter = 0;
+            var content = from input in tcontent.First().Descendants("a") select input;
+            foreach (var node in content)
+            {
+                Logger.Log("Processing user started.");
+                var user = new User
+                {
+                    Nick = node.InnerText,
+                    Address = node.Attributes["href"].Value
+                };
+                var existing = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", user.Nick)).List<User>().FirstOrDefault();
+                if (existing != null)
+                    user = existing;
+                Logger.Log("Nick: " + user.Nick);
+                GetUserInfo(user, false);
+                Logger.Log("Saving user...");
+                _session.SaveOrUpdate(user);
+                _session.Flush();
+                Logger.Log("User saved!");
+                ++userCounter;
+                if (userCounter == _maxUsers)
+                    break;
             }
         }
 
