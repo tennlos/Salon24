@@ -11,6 +11,7 @@
     <property name="PostCount" />
     <property name="CommentCount" />
     <property name="LastUpdatedOn" />
+    <property name="Type" />
     
     
     <!--

@@ -7,7 +7,7 @@ namespace SalonCrawler
         public static void Main(string[] args)
         {
             var session = NHibernateHelper.GetCurrentSession();
-            var crawler = new Crawler(session, 2, 10);
+            var crawler = new Crawler(session, 100, 150);
             crawler.Crawl();
             session.Close();
             Logger.Log("Crawling finished.");

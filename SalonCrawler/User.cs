@@ -19,5 +19,6 @@ namespace SalonCrawler {
         public virtual DateTime? LastUpdatedOn { get; set; }
         public virtual IList<Post> Posts { get; set; }
         public virtual IList<Newspaper> Newspapers { get; set; }
+        public virtual int? Type { get; set; }
     }
 }
