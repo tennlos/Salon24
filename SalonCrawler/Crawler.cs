@@ -149,6 +149,8 @@ namespace SalonCrawler
                 var existing = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", user.Nick)).List<User>().FirstOrDefault();
                 if (existing != null)
                     user = existing;
+                else
+                    _session.Save(user);
                 Logger.Log("Nick: " + user.Nick);
                 GetUserInfo(user, false);
                 Logger.Log("Saving user...");
@@ -183,6 +185,7 @@ namespace SalonCrawler
                     user.AboutMe = String.Empty;
                     user.PostCount = 0;
                     user.Description = String.Empty;
+                    user.Type = 2;
                 }
                 else
                 {
@@ -190,6 +193,12 @@ namespace SalonCrawler
                     user.PostCount = Convert.ToInt32(CrawlerHelper.GetStringValueByClass(content, "with-icon author-posts"));
                     user.CommentCount = Convert.ToInt32(CrawlerHelper.GetStringValueByClass(content, "with-icon author-comments"));
                     user.Description = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueById(doc.DocumentNode, "blog-header-title"));
+                    if (CrawlerHelper.GetNodeByClass(doc.DocumentNode, "theme_1 ") != null)
+                        user.Type = 0;
+                    else if (CrawlerHelper.GetNodeByClass(doc.DocumentNode, "theme_2 ") != null)
+                        user.Type = 1;
+                    else
+                        user.Type = 2;
                 }
                 user.LastUpdatedOn = DateTime.Now;
 
