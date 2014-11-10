@@ -10,7 +10,6 @@
     <property name="Address"/>
     <property name="CommentCount" />
     <property name="PostContent" type="string" length="1000000" />
-    <property name="Tags" />
     <property name="LastUpdatedOn" />
 
     <many-to-one name="User">
@@ -27,6 +26,14 @@
     <bag name="Newspapers" table="Repost" lazy="false" cascade="all">
       <key column="PostID" />
       <many-to-many class="Newspaper" column="PaperID" />
+    </bag>
+    <bag name="Tags" table="POST_TAG" lazy="false" cascade="all">
+      <key column="PostID" />
+      <many-to-many class="Tag" column="TagID" />
+    </bag>
+    <bag name="Links" table="COMMENT_POST_LINK" lazy="false" cascade="all">
+      <key column="PostID" />
+      <many-to-many class="Link" column="LinkID" />
     </bag>
   </class>
 </hibernate-mapping>

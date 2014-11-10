@@ -21,6 +21,7 @@ namespace SalonCrawler
 
         private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>();
         private readonly Dictionary<string, Newspaper> _currentNewspapers = new Dictionary<string, Newspaper>();
+        private readonly Dictionary<string, Tag> _currentTags = new Dictionary<string, Tag>();
 
         public Crawler(ISession session, int maxUsers, int maxPages)
         {
@@ -76,6 +77,7 @@ namespace SalonCrawler
                     var address = firstOrDefault.Attributes["href"].Value;
                     GetCategoryInfo(category, address);
                     _session.Save(category);
+                    _session.Flush();
                     ++idCounter;
                 }
             }
@@ -144,7 +146,7 @@ namespace SalonCrawler
                 var user = new User
                 {
                     Nick = node.InnerText,
-                    Address = node.Attributes["href"].Value
+                    Address = node.Attributes["href"].Value,
                 };
                 var existing = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", user.Nick)).List<User>().FirstOrDefault();
                 if (existing != null)
@@ -205,6 +207,7 @@ namespace SalonCrawler
                 if (!basic)
                 {
                     _currentNewspapers.Clear();
+                    _currentTags.Clear();
                 }
 
                 user.Posts = basic ? new List<Post>() : GetPostsForPage(doc, user, 1);
@@ -282,18 +285,27 @@ namespace SalonCrawler
                 newPost.CommentCount = Convert.ToInt32(
                     CrawlerHelper.GetStringValueByTagAndClass(postNode, "span", "sep", 1).Split(' ')[0]);
                 newPost.PostContent = WebUtility.HtmlDecode(GetContent(postNode, userAddress));
-                newPost.Tags = GetTags(CrawlerHelper.GetNodeByClass(postNode, "post-tags"));
+                GetTags(CrawlerHelper.GetNodeByClass(postNode, "post-tags"), newPost);
                 newPost.LastUpdatedOn = DateTime.Now;
 
                 newPost.Comments = new List<Comment>();
                 newPost.Comments = GetComments(doc, newPost);
                 newPost.Newspapers = GetNewspapers(doc, newPost);
+                newPost.Links = GetLinks(doc, newPost);
 
             }
             catch (Exception e)
             {
                 Logger.Log(e);
             }
+        }
+
+        private IList<Link> GetLinks(HtmlDocument doc, Post newPost)
+        {
+            var links = new List<Link>();
+            
+            //todo:
+            return links;
         }
 
         private IList<Newspaper> GetNewspapers(HtmlDocument doc, Post newPost)
@@ -381,21 +393,38 @@ namespace SalonCrawler
             return _session.Get<User>(user.Id);
         }
 
-        private string GetTags(HtmlNode tagsNode)
+        private void GetTags(HtmlNode tagsNode, Post post)
         {
             Logger.Log("Getting tags for the post.");
 
-            var list = CrawlerHelper.GetAllStringValuesByTag(tagsNode, "strong");
-            var tagString = new StringBuilder();
+            post.Tags = new List<Tag>();
+            var list =  CrawlerHelper.GetAllStringValuesByTag(tagsNode, "strong");
             foreach (var tag in list)
             {
-                tagString.Append(tag).Append(", ");
+                var fixedTag = WebUtility.HtmlDecode(tag);
+                var _tag = _session.CreateCriteria<Tag>().Add(Restrictions.Eq("Name", fixedTag)).List<Tag>().FirstOrDefault();
+                if (_tag != null)
+                {
+                    post.Tags.Add(_tag);
+                }
+                else
+                {
+                    if (_currentTags.ContainsKey(fixedTag))
+                    {
+                        var existing = _currentTags[fixedTag];
+                        //existing.Posts.Add(newPost);
+                        post.Tags.Add(existing);
+                    }
+                    else
+                    {
+                        Tag newtag = new Tag();
+                        newtag.Name = fixedTag;
+                        post.Tags.Add(newtag);
+                        _currentTags[fixedTag] = newtag;
+                    }
+                    
+                }
             }
-            if (tagString.Length > 0)
-            {
-                tagString.Remove(tagString.Length - 2, 2);
-            }
-            return tagString.ToString();
         }
 
         private string GetContent(HtmlNode postNode, string userAddress)

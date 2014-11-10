@@ -12,5 +12,6 @@ namespace SalonCrawler {
         public virtual string Title { get; set; }
         public virtual string CommentContent { get; set; }
         public virtual DateTime CreationDate { get; set; }
+        public virtual IList<Link> Links { get; set; }
     }
 }

@@ -13,5 +13,9 @@
     <property name="Title" type="string" length="1000000"/>
     <property name="CommentContent" type="string" length="1000000"/>
     <property name="CreationDate" not-null="true"/>
+    <bag name="Links" table="COMMENT_POST_LINK" lazy="false" cascade="all">
+      <key column="CommentID" />
+      <many-to-many class="Link" column="LinkID" />
+    </bag>
   </class>
 </hibernate-mapping>

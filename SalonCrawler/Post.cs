@@ -14,10 +14,11 @@ namespace SalonCrawler {
         public virtual DateTime Date { get; set; }
         public virtual int? CommentCount { get; set; }
         public virtual string PostContent { get; set; }
-        public virtual string Tags { get; set; }
         public virtual string Address { get; set; }
         public virtual DateTime? LastUpdatedOn { get; set; }
         public virtual IList<Comment> Comments { get; set; }
         public virtual IList<Newspaper> Newspapers { get; set; }
+        public virtual IList<Tag> Tags{ get; set; }
+        public virtual IList<Link> Links { get; set; }
     }
 }

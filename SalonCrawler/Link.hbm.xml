@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hibernate-mapping assembly="SalonCrawler" namespace="SalonCrawler" xmlns="urn:nhibernate-mapping-2.2">
+  <class name="Link" table="LINK">
+    <id name="Id" column="ID">
+      <generator class="identity" />
+    </id>
+    <property name="Domain" not-null="true" />
+    <property name="URL" not-null="true" />
+    <bag name="Posts" table="COMMENT_POST_LINK" lazy="false" inverse="true">
+      <key column="LinkID" />
+      <many-to-many class="Post" column="PostID" />
+    </bag>
+    <bag name="Comments" table="COMMENT_POST_LINK" lazy="false" inverse="true">
+      <key column="LinkID" />
+      <many-to-many class="Comment" column="CommentID" />
+    </bag>
+  </class>
+</hibernate-mapping>
