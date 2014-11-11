@@ -84,7 +84,7 @@ namespace SalonCrawler
             }
             catch (Exception e)
             {
-                Logger.Log(e);
+                Logger.Log(e, "Categories");
             }
         }
 
@@ -104,7 +104,7 @@ namespace SalonCrawler
             }
             catch (Exception e)
             {
-                Logger.Log(e);
+                Logger.Log(e, newCategory);
             }
         }
 
@@ -133,7 +133,7 @@ namespace SalonCrawler
             }
             catch (Exception e)
             {
-                Logger.Log(e);
+                Logger.Log(e, "Users");
             }
         }
 
@@ -215,7 +215,7 @@ namespace SalonCrawler
             }
             catch (Exception e)
             {
-                Logger.Log(e);
+                Logger.Log(e, user);
             }
         }
 
@@ -297,7 +297,7 @@ namespace SalonCrawler
             }
             catch (Exception e)
             {
-                Logger.Log(e);
+                Logger.Log(e, newPost);
             }
         }
 
@@ -423,10 +423,10 @@ namespace SalonCrawler
             foreach (var tag in list)
             {
                 var fixedTag = WebUtility.HtmlDecode(tag);
-                var _tag = _session.CreateCriteria<Tag>().Add(Restrictions.Eq("Name", fixedTag)).List<Tag>().FirstOrDefault();
-                if (_tag != null)
+                var foundTag = _session.CreateCriteria<Tag>().Add(Restrictions.Eq("Name", fixedTag)).List<Tag>().FirstOrDefault();
+                if (foundTag != null)
                 {
-                    post.Tags.Add(_tag);
+                    post.Tags.Add(foundTag);
                 }
                 else
                 {
@@ -438,10 +438,12 @@ namespace SalonCrawler
                     }
                     else
                     {
-                        Tag newtag = new Tag();
-                        newtag.Name = fixedTag;
-                        post.Tags.Add(newtag);
-                        _currentTags[fixedTag] = newtag;
+                        var newTag = new Tag
+                        {
+                            Name = fixedTag
+                        };
+                        post.Tags.Add(newTag);
+                        _currentTags[fixedTag] = newTag;
                     }
                     
                 }
@@ -549,7 +551,7 @@ namespace SalonCrawler
             }
             catch (WebException ex) 
             {
-                Logger.Log(ex);
+                Logger.Log(ex, "HtmlDocument");
                 return null;
             }
             
