@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using System.IO;
 using System.Net;
@@ -291,7 +292,7 @@ namespace SalonCrawler
                 newPost.Comments = new List<Comment>();
                 newPost.Comments = GetComments(doc, newPost);
                 newPost.Newspapers = GetNewspapers(doc, newPost);
-                newPost.Links = GetLinks(doc, newPost);
+                newPost.Links = GetLinksForPost(newPost);
 
             }
             catch (Exception e)
@@ -300,11 +301,31 @@ namespace SalonCrawler
             }
         }
 
-        private IList<Link> GetLinks(HtmlDocument doc, Post newPost)
+        private IList<Link> GetLinksForPost(Post post)
+        {
+            return GetLinks(post.PostContent);
+        }
+
+        private IList<Link> GetLinksForComment(Comment comment)
+        {
+            return GetLinks(comment.CommentContent);
+        }
+
+        private IList<Link> GetLinks(string content)
         {
             var links = new List<Link>();
-            
-            //todo:
+
+            Match m = Regex.Match(content, @"http://([\w+?\.\-\w+]+)[^\s]+");
+
+            while (m.Success)
+            {
+                var link = new Link();
+                link.URL = m.Value;
+                link.Domain = m.Groups[1].Value;
+                links.Add(link);
+                m = m.NextMatch();
+            }
+
             return links;
         }
 
@@ -486,6 +507,7 @@ namespace SalonCrawler
             var commentCount = Convert.ToInt32(
                 CrawlerHelper.GetStringValueByClass(commentNode, "with-icon author-comments"));
             newComment.User = GetUserForComment(userNick, userAddress, commentCount);
+            newComment.Links = GetLinksForComment(newComment);
         }
 
         private User GetUserForComment(string nick, string address, int commentCount)
