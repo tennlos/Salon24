@@ -250,10 +250,11 @@ namespace SalonCrawler
                     var address = node.Attributes["href"].Value;
                     if (lastNode != null && address.StartsWith(lastNode)) // the same link again
                         continue;
+                    var date = Utils.ParseDate(CrawlerHelper.GetStringValueByClass(post.ParentNode, "post-created"));
                     Logger.Log("Processing post started.");
                     Logger.Log("Address: " + address);
                     lastNode = address;
-                    var newPost = new Post { User = user, Address = address };
+                    var newPost = new Post { User = user, Address = address, Date = date };
                     GetPostInfo(newPost, address, user.Address);
                     postList.Add(newPost);
                 }
@@ -276,24 +277,29 @@ namespace SalonCrawler
             try
             {
                 var sitePostId = address.Split('/')[3].Split(',')[0];
-                newPost.Title = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueByClass(doc.DocumentNode, "cqi_s_no cqi_t_post cqi_oid_" + sitePostId));
-                var dateString = CrawlerHelper.GetStringValueByClass(doc.DocumentNode, "created");
-                newPost.Date = Utils.ParseDate(dateString);
-                var postNode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post");
-                var categoryCode = CrawlerHelper.GetStringValueByTagAndClass(postNode, "span", "sep").
-                    Split(':')[1].Substring(1);
-                newPost.Category = _session.Get<Category>(_categoryDict[categoryCode]);
-                newPost.CommentCount = Convert.ToInt32(
-                    CrawlerHelper.GetStringValueByTagAndClass(postNode, "span", "sep", 1).Split(' ')[0]);
-                newPost.PostContent = WebUtility.HtmlDecode(GetContent(postNode, userAddress));
-                GetTags(CrawlerHelper.GetNodeByClass(postNode, "post-tags"), newPost);
-                newPost.LastUpdatedOn = DateTime.Now;
+                var encodedTitle = CrawlerHelper.GetStringValueByClass(doc.DocumentNode, "cqi_s_no cqi_t_post cqi_oid_" + sitePostId);
+                if (encodedTitle == null)
+                {
+                    newPost.Title = "*** BRAK DOSTĘPU ***";
+                    newPost.LastUpdatedOn = DateTime.Now;
+                    newPost.Comments = new List<Comment>();
+                }
+                else
+                {
+                    newPost.Title = WebUtility.HtmlDecode(CrawlerHelper.GetStringValueByClass(doc.DocumentNode, "cqi_s_no cqi_t_post cqi_oid_" + sitePostId));
+                    var postNode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post");
+                    var categoryCode = CrawlerHelper.GetStringValueByTagAndClass(postNode, "span", "sep").Split(':')[1].Substring(1);
+                    newPost.Category = _session.Get<Category>(_categoryDict[categoryCode]);
+                    newPost.CommentCount = Convert.ToInt32(CrawlerHelper.GetStringValueByTagAndClass(postNode, "span", "sep", 1).Split(' ')[0]);
+                    newPost.PostContent = WebUtility.HtmlDecode(GetContent(postNode, userAddress));
+                    GetTags(CrawlerHelper.GetNodeByClass(postNode, "post-tags"), newPost);
+                    newPost.LastUpdatedOn = DateTime.Now;
 
-                newPost.Comments = new List<Comment>();
-                newPost.Comments = GetComments(doc, newPost);
-                newPost.Newspapers = GetNewspapers(doc, newPost);
-                newPost.Links = GetLinksForPost(newPost);
-
+                    newPost.Comments = new List<Comment>();
+                    newPost.Comments = GetComments(doc, newPost);
+                    newPost.Newspapers = GetNewspapers(doc, newPost);
+                    newPost.Links = GetLinksForPost(newPost);
+                }
             }
             catch (Exception e)
             {
@@ -350,7 +356,7 @@ namespace SalonCrawler
                 if (newspaperContent == null)
                     continue;
                 var newspaper = new Newspaper();
-                var nameNode = CrawlerHelper.GetNodeByID(newspaperContent.DocumentNode, "newspaper-header");
+                var nameNode = CrawlerHelper.GetNodeById(newspaperContent.DocumentNode, "newspaper-header");
                 var name = WebUtility.HtmlDecode(nameNode.Descendants("a").First().InnerText);
                 var newspaperForName = _session.CreateCriteria<Newspaper>()
                     .Add(Restrictions.Eq("Name", name)).List<Newspaper>().FirstOrDefault();
