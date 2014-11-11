@@ -512,8 +512,15 @@ namespace SalonCrawler
             newComment.CreationDate = Utils.ParseDate(dateString);
             var userNick = CrawlerHelper.GetStringValueByPartialClass(commentNode, "author-nick");
             var userAddress = CrawlerHelper.GetNodeByPartialClass(commentNode, "author-nick").Attributes["href"].Value;
-            var commentCount = Convert.ToInt32(
-                CrawlerHelper.GetStringValueByClass(commentNode, "with-icon author-comments"));
+            var commentCount = 0;
+            try
+            {
+                commentCount = Convert.ToInt32(CrawlerHelper.GetStringValueByClass(commentNode, "with-icon author-comments"));
+            }
+            catch (Exception e)
+            {
+                Logger.Log(e, newComment);
+            }
             newComment.User = GetUserForComment(userNick, userAddress, commentCount);
             newComment.Links = GetLinksForComment(newComment);
         }

@@ -47,6 +47,14 @@ namespace SalonCrawler
                 address = post.Address;
             }
 
+            var comment = entity as Comment;
+            if (comment != null)
+            {
+                type = "Comment";
+                info = comment.Title;
+                address = comment.Post.Address;
+            }
+
             var str = entity as string;
             if (str != null)
             {
