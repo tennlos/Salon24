@@ -5,7 +5,7 @@
       <generator class="identity" />
     </id>
     <property name="Name" not-null="true" />
-    <bag name="Posts" table="POST_TAG" lazy="false" inverse="true">
+    <bag name="Posts" table="POST_TAG" lazy="true" inverse="true">
       <key column="TagID" />
       <many-to-many class="Post" column="PostID" />
     </bag>

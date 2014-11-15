@@ -14,29 +14,70 @@ namespace SalonCrawler
     public class Crawler
     {
         private const string HomePage = "http://www.salon24.pl/";
-        private const string UserPage = "http://www.salon24.pl/catalog/1,1,CountPosts,2";
+
+        private static string _userPage = "http://www.salon24.pl/katalog-blogow/1,1,CountPosts,2";
 
         private readonly ISession _session;
-        private readonly int _maxUsers;
+        private readonly int _firstUser;
+        private readonly int _lastUser;
         private readonly int _maxPages;
+        private readonly bool _crawlLeft;
+        private readonly bool _crawlRight;
+        private readonly bool _crawlCommon;
+        private readonly bool _crawlCategories;
+        private readonly DateTime _startDate;
 
         private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>();
         private readonly Dictionary<string, Newspaper> _currentNewspapers = new Dictionary<string, Newspaper>();
         private readonly Dictionary<string, Tag> _currentTags = new Dictionary<string, Tag>();
 
-        public Crawler(ISession session, int maxUsers, int maxPages)
+        public Crawler(ISession session, DateTime startDate, bool crawlCategories, UserType crawledUsers, int maxPages,
+            int firstUser, int lastUser, CrawledColumns crawledColumns = CrawledColumns.Both, int commonUserPage = 0)
         {
             _session = session;
-            _maxUsers = maxUsers;
+            _lastUser = lastUser;
+            _firstUser = firstUser;
             _maxPages = maxPages;
+            _crawlLeft = crawledColumns != CrawledColumns.Right;
+            _crawlRight = crawledColumns != CrawledColumns.Left;
+            switch (crawledUsers)
+            {
+                case UserType.Publicist:
+                    _userPage = "http://www.salon24.pl/katalog-blogow/1,1,CountPosts,2";
+                    _crawlCommon = false;
+                    break;
+                case UserType.Official:
+                    _userPage = "http://www.salon24.pl/katalog-blogow/2,1,CountPosts,2";
+                    _crawlCommon = false;
+                    break;
+                case UserType.Common:
+                    _userPage = "http://www.salon24.pl/katalog-blogow/0," + commonUserPage + ",CountPosts,2";
+                    _crawlCommon = true;
+                    break;
+            }
+            _crawlCategories = crawlCategories;
+            _startDate = startDate;
         }
 
         public void Crawl()
         {
             Logger.Log("Crawling started.");
 
-            CrawlCategories();
+            if (_crawlCategories)
+                CrawlCategories();
+            else
+                LoadCategories();
+
             CrawlUsers();
+        }
+
+        private void LoadCategories()
+        {
+            var categories = _session.CreateCriteria<Category>().List<Category>();
+            foreach (var category in categories)
+            {
+                _categoryDict[category.Code] = category.Id;
+            }
         }
 
         private void CrawlCategories()
@@ -112,24 +153,30 @@ namespace SalonCrawler
         {
             Logger.Log("Crawling users...");
 
-            var request = WebRequest.Create(UserPage);
+            var request = WebRequest.Create(_userPage);
             var doc = GetHtmlDocument(request);
             if (doc == null)
                 return;
 
             try
             {
-                var leftside =
-                    from input in doc.DocumentNode.Descendants("ul")
-                    where input.Attributes["class"] != null && input.Attributes["class"].Value == "author-list-2cols-left"
-                    select input;
-                ProcessUser(leftside);
-                var rightside =
-                    from input in doc.DocumentNode.Descendants("ul")
-                    where input.Attributes["class"] != null && input.Attributes["class"].Value == "author-list-2cols-right"
-                    select input;
-                ProcessUser(rightside);
-                
+                if (_crawlLeft)
+                {
+                    var leftside =
+                        from input in doc.DocumentNode.Descendants("ul")
+                        where input.Attributes["class"] != null && input.Attributes["class"].Value == "author-list-2cols-left"
+                        select input;
+                    ProcessUser(leftside);
+                }
+                if (_crawlRight)
+                {
+                    var rightside =
+                        from input in doc.DocumentNode.Descendants("ul")
+                        where input.Attributes["class"] != null && input.Attributes["class"].Value == "author-list-2cols-right"
+                        select input;
+                    ProcessUser(rightside);
+                }
+
             }
             catch (Exception e)
             {
@@ -143,25 +190,37 @@ namespace SalonCrawler
             var content = from input in tcontent.First().Descendants("a") select input;
             foreach (var node in content)
             {
-                Logger.Log("Processing user started.");
-                var user = new User
+                if (userCounter < _firstUser)
                 {
-                    Nick = node.InnerText,
-                    Address = node.Attributes["href"].Value,
-                };
-                var existing = _session.CreateCriteria<User>().Add(Restrictions.Eq("Nick", user.Nick)).List<User>().FirstOrDefault();
-                if (existing != null)
-                    user = existing;
-                else
-                    _session.Save(user);
-                Logger.Log("Nick: " + user.Nick);
-                GetUserInfo(user, false);
-                Logger.Log("Saving user...");
-                _session.SaveOrUpdate(user);
-                _session.Flush();
-                Logger.Log("User saved!");
+                    ++userCounter;
+                    continue;
+                }
+                if (!_crawlCommon || (node.GetAttributeValue("class", String.Empty) == "author-nick ut_user_4"))
+                {
+                    Logger.Log("Processing user started.");
+                    var user = new User
+                    {
+                        Nick = node.InnerText,
+                        Address = node.Attributes["href"].Value,
+                    };
+                    var existing =
+                        _session.CreateCriteria<User>()
+                            .Add(Restrictions.Eq("Nick", user.Nick))
+                            .List<User>()
+                            .FirstOrDefault();
+                    if (existing != null)
+                        user = existing;
+                    else
+                        _session.Save(user);
+                    Logger.Log("Nick: " + user.Nick);
+                    GetUserInfo(user, false);
+                    Logger.Log("Saving user...");
+                    _session.SaveOrUpdate(user);
+                    _session.Flush();
+                    Logger.Log("User saved!");
+                }
                 ++userCounter;
-                if (userCounter == _maxUsers)
+                if (userCounter > _lastUser)
                     break;
             }
         }
@@ -241,6 +300,7 @@ namespace SalonCrawler
 
             var postList = new List<Post>();
             var posts = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post-list");
+            var dateReached = false;
             foreach (var post in posts.Descendants("h2"))
             {
                 var content = from input in post.Descendants("a") select input;
@@ -251,6 +311,11 @@ namespace SalonCrawler
                     if (lastNode != null && address.StartsWith(lastNode)) // the same link again
                         continue;
                     var date = Utils.ParseDate(CrawlerHelper.GetStringValueByClass(post.ParentNode, "post-created"));
+                    if (DateTime.Compare(date, _startDate) < 0)
+                    {
+                        dateReached = true;
+                        break;
+                    }
                     Logger.Log("Processing post started.");
                     Logger.Log("Address: " + address);
                     lastNode = address;
@@ -258,10 +323,15 @@ namespace SalonCrawler
                     GetPostInfo(newPost, address, user.Address);
                     postList.Add(newPost);
                 }
+                if (dateReached)
+                    break;
             }
-            var addlist = GetPostsForPage(doc, user, ++page);
-            if (addlist.Count > 0)
-                postList.AddRange(addlist);
+            if (!dateReached)
+            {
+                var addlist = GetPostsForPage(doc, user, ++page);
+                if (addlist.Count > 0)
+                    postList.AddRange(addlist);
+            }
             return postList;
         }
 
@@ -321,13 +391,15 @@ namespace SalonCrawler
         {
             var links = new List<Link>();
 
-            Match m = Regex.Match(content, @"http://([\w+?\.\-\w+]+)[^\s]+");
+            var m = Regex.Match(content, @"http://([\w+?\.\-\w+]+)[^\s]+");
 
             while (m.Success)
             {
-                var link = new Link();
-                link.URL = m.Value;
-                link.Domain = m.Groups[1].Value;
+                var link = new Link
+                {
+                    URL = m.Value, 
+                    Domain = m.Groups[1].Value
+                };
                 links.Add(link);
                 m = m.NextMatch();
             }
@@ -512,14 +584,14 @@ namespace SalonCrawler
             newComment.CreationDate = Utils.ParseDate(dateString);
             var userNick = CrawlerHelper.GetStringValueByPartialClass(commentNode, "author-nick");
             var userAddress = CrawlerHelper.GetNodeByPartialClass(commentNode, "author-nick").Attributes["href"].Value;
-            var commentCount = 0;
+            int commentCount;
             try
             {
                 commentCount = Convert.ToInt32(CrawlerHelper.GetStringValueByClass(commentNode, "with-icon author-comments"));
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                Logger.Log(e, newComment);
+                commentCount = 0;
             }
             newComment.User = GetUserForComment(userNick, userAddress, commentCount);
             newComment.Links = GetLinksForComment(newComment);

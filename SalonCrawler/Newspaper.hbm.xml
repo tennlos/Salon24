@@ -9,7 +9,7 @@
     </many-to-one>
     <property name="Name" not-null="true" />
     <property name="Description"/>
-    <bag name="Posts" table="Repost" lazy="false" inverse="true">
+    <bag name="Posts" table="Repost" lazy="true" inverse="true">
       <key column="PaperID" />
       <many-to-many class="Post" column="PostID" />
     </bag>

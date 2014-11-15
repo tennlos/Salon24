@@ -52,7 +52,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Category.cs" />
+    <Compile Include="UserType.cs" />
     <Compile Include="Comment.cs" />
+    <Compile Include="CrawledColumns.cs" />
     <Compile Include="Crawler.cs" />
     <Compile Include="CrawlerHelper.cs" />
     <Compile Include="Link.cs" />
