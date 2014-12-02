@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using HtmlAgilityPack;
 using System.IO;
 using System.Net;
 using NHibernate;
 using NHibernate.Criterion;
+using NHibernate.Transform;
 
 namespace SalonCrawler
 {
@@ -25,7 +27,7 @@ namespace SalonCrawler
         private readonly bool _crawlRight;
         private readonly bool _crawlCommon;
         private readonly bool _crawlCategories;
-        private readonly DateTime _startDate;
+        private DateTime _startDate;
 
         private readonly Dictionary<string, int> _categoryDict = new Dictionary<string, int>();
         private readonly Dictionary<string, Newspaper> _currentNewspapers = new Dictionary<string, Newspaper>();
@@ -84,8 +86,7 @@ namespace SalonCrawler
         {
             Logger.Log("Crawling categories...");
 
-            var request = WebRequest.Create(HomePage);
-            var doc = GetHtmlDocument(request);
+            var doc = GetHtmlDocument(HomePage);
             if (doc == null)
                 return;
 
@@ -133,8 +134,7 @@ namespace SalonCrawler
         {
             Logger.Log("Getting category info.");
 
-            var request = WebRequest.Create(address);
-            var doc = GetHtmlDocument(request);
+            var doc = GetHtmlDocument(address);
             if (doc == null)
                 return;
 
@@ -153,8 +153,7 @@ namespace SalonCrawler
         {
             Logger.Log("Crawling users...");
 
-            var request = WebRequest.Create(_userPage);
-            var doc = GetHtmlDocument(request);
+            var doc = GetHtmlDocument(_userPage);
             if (doc == null)
                 return;
 
@@ -229,8 +228,24 @@ namespace SalonCrawler
         {
             Logger.Log("Getting user info.");
 
-            var request = WebRequest.Create(user.Address);
-            var doc = GetHtmlDocument(request);
+            HtmlDocument doc;
+            try
+            {
+                doc = GetHtmlDocument(user.Address);
+            }
+            catch (WebException e)
+            {
+                if (!e.Message.Contains("404") && !e.Message.Contains("timed out"))
+                    throw;
+                user.Type = 2;
+                return;
+            }
+            catch (UriFormatException)
+            {
+                user.Type = 2;
+                return;
+            }
+
             if (doc == null)
                 return;
 
@@ -290,7 +305,7 @@ namespace SalonCrawler
                     var nextpage = CrawlerHelper.GetNodeByClass(pagenode, "pages_right");
                     if (nextpage == null)
                         return new List<Post>();
-                    doc = GetHtmlDocument(WebRequest.Create(user.Address + nextpage.Attributes["href"].Value));
+                    doc = GetHtmlDocument(user.Address + nextpage.Attributes["href"].Value);
                     if (doc == null)
                         return new List<Post>();
                 }
@@ -311,7 +326,7 @@ namespace SalonCrawler
                     if (lastNode != null && address.StartsWith(lastNode)) // the same link again
                         continue;
                     var date = Utils.ParseDate(CrawlerHelper.GetStringValueByClass(post.ParentNode, "post-created"));
-                    if (DateTime.Compare(date, _startDate) < 0)
+                    if (DateTime.Compare(date, _startDate) <= 0)
                     {
                         dateReached = true;
                         break;
@@ -339,8 +354,7 @@ namespace SalonCrawler
         {
             Logger.Log("Getting post info.");
 
-            var request = WebRequest.Create(address);
-            var doc = GetHtmlDocument(request);
+            var doc = GetHtmlDocument(address);
             if (doc == null)
                 return;
 
@@ -423,8 +437,7 @@ namespace SalonCrawler
                 var address = node.Attributes["href"].Value;
                 if (!address.StartsWith("http://lubczasopismo")) // the same link again
                     continue;
-                var request = WebRequest.Create(address);
-                var newspaperContent = GetHtmlDocument(request);
+                var newspaperContent = GetHtmlDocument(address);
                 if (newspaperContent == null)
                     continue;
                 var newspaper = new Newspaper();
@@ -497,7 +510,7 @@ namespace SalonCrawler
             Logger.Log("Getting tags for the post.");
 
             post.Tags = new List<Tag>();
-            var list =  CrawlerHelper.GetAllStringValuesByTag(tagsNode, "strong");
+            var list = tagsNode != null ? CrawlerHelper.GetAllStringValuesByTag(tagsNode, "strong") : new List<string>();
             foreach (var tag in list)
             {
                 var fixedTag = WebUtility.HtmlDecode(tag);
@@ -538,8 +551,7 @@ namespace SalonCrawler
             var pageLinkNodes = CrawlerHelper.GetAllNodesByTagAndClass(postNode, "a", "pages_pos");
             foreach (var pageLinkNode in pageLinkNodes)
             {
-                var request = WebRequest.Create(userAddress + pageLinkNode.Attributes["href"].Value);
-                var doc = GetHtmlDocument(request);
+                var doc = GetHtmlDocument(userAddress + pageLinkNode.Attributes["href"].Value);
                 if (doc == null)
                     return contentBuilder.ToString();
                 var pagePostNode = CrawlerHelper.GetNodeByClass(doc.DocumentNode, "post");
@@ -617,12 +629,37 @@ namespace SalonCrawler
             return _session.Get<User>(user.Id);
         }
 
-        private HtmlDocument GetHtmlDocument(WebRequest request)
+        private HtmlDocument GetHtmlDocument(string url)
         {
             try
             {
-                var response = request.GetResponse();
-                var data = response.GetResponseStream();
+                Stream data = null;
+
+                var repeat = true;
+                while (repeat)
+                {
+                    repeat = false;
+                    try
+                    {
+                        var request = WebRequest.Create(url);
+                        var response = request.GetResponse();
+                        data = response.GetResponseStream();
+                    }
+                    catch (WebException e)
+                    {
+                        if (e.Message.Contains("503"))
+                        {
+                            Logger.Log(e, null);
+                            repeat = true;
+                            Thread.Sleep(60000);
+                        }
+                        else
+                        {
+                            throw;
+                        }
+                    }
+                }
+                
                 var doc = new HtmlDocument();
 
                 string html;
@@ -640,6 +677,31 @@ namespace SalonCrawler
                 return null;
             }
             
+        }
+
+        public void CrawlOnlyNewPosts()
+        {
+            LoadCategories();
+            //var existingPosters = _session.CreateCriteria<User>().Add(Restrictions.IsNotEmpty("Posts")).List<User>();
+            var existingPosters = _session.QueryOver<User>().Where(Restrictions.IsNotEmpty("Posts")).TransformUsing(Transformers.DistinctRootEntity).Fetch(a => a.Posts).Eager.List<User>();
+            var iterator = 0;
+            foreach (var user in existingPosters)
+            {
+                ++iterator;
+                Logger.Log("Nick: " + user.Nick);
+                Logger.Log("#" + iterator);
+                var newestPost = _session.QueryOver<Post>().Where(Restrictions.Eq("User", user)).Fetch(a => a.Date).Eager.OrderBy(p => p.Date).Desc().Take(1).List<Post>().First();
+                _startDate = newestPost.Date;
+                var posts = GetPostsForPage(GetHtmlDocument(user.Address), user, 1);
+                foreach (var post in posts)
+                {
+                    post.User = user;
+                    user.Posts.Add(post);
+                    _session.Save(post);
+                }
+                Logger.Log("Saving user...");
+                _session.SaveOrUpdate(user);
+            }
         }
     }
 }

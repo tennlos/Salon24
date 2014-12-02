@@ -70,7 +70,8 @@ namespace SalonCrawler
         public static IList<string> GetAllStringValuesByTag(HtmlNode node, string htag)
         {
             var k = node.Descendants(htag);
-            return k.Select(htmlNode => htmlNode.InnerText).ToList();
+            var htmlNodes = k as HtmlNode[] ?? k.ToArray();
+            return htmlNodes.Any() ? new List<string>() : htmlNodes.Select(htmlNode => htmlNode.InnerText).ToList();
         }
     }
 }

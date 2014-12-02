@@ -23,15 +23,15 @@
       <key column="PostID" />
       <one-to-many class="Comment" />
     </bag>
-    <bag name="Newspapers" table="Repost" lazy="false" cascade="all">
+    <bag name="Newspapers" table="Repost" lazy="true" cascade="all">
       <key column="PostID" />
       <many-to-many class="Newspaper" column="PaperID" />
     </bag>
-    <bag name="Tags" table="POST_TAG" lazy="false" cascade="all">
+    <bag name="Tags" table="POST_TAG" lazy="true" cascade="all">
       <key column="PostID" />
       <many-to-many class="Tag" column="TagID" />
     </bag>
-    <bag name="Links" table="COMMENT_POST_LINK" lazy="false" cascade="all">
+    <bag name="Links" table="COMMENT_POST_LINK" lazy="true" cascade="all">
       <key column="PostID" />
       <many-to-many class="Link" column="LinkID" />
     </bag>
